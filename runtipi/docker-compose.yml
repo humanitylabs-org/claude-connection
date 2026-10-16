@@ -12,7 +12,7 @@ services:
     mem_limit: 128m
     environment:
       WIZARD_APP: wizard-claude
-      APP_VERSION: 0.1.0
+      APP_VERSION: 0.1.1
       FRONT_PORT: "8799"
       UPSTREAM_HOST: wizard-claude-engine
       UPSTREAM_PORT: "8799"
@@ -239,7 +239,7 @@ services:
       is_main: true
       internal_port: 8799
   wizard-claude-engine:
-    image: ghcr.io/humanitylabs-org/wizard-claude:0.1.0@sha256:770634847f40e4c1fbe736612b071185e88e1af4a9325ee7eff58b7f157ef113
+    image: ghcr.io/humanitylabs-org/wizard-claude:0.1.1@sha256:81f19807d36cf5aece67ddc4ea80de3905d0a0d0e7295de8cca7ad61c316ee34
     user: "1000:1000"
     read_only: true
     cap_drop: [ALL]
@@ -252,6 +252,8 @@ services:
     environment:
       WIZARD_CLAUDE_PORT: "8799"
       WIZARD_CLAUDE_PASSWORD: ${WIZARD_CLAUDE_PASSWORD:-}
+      WIZARD_TRUSTED_ORIGINS: ${WIZARD_TRUSTED_ORIGINS:-}
+      WIZARD_TRUSTED_HOSTS: ${WIZARD_TRUSTED_HOSTS:-}
     volumes:
       # The Claude sign-in, shared with Hermes Agent (and the older AI Accounts app) under the same fixed
       # name, so an existing sign-in carries over. Never under /media: the Files app serves that folder.
