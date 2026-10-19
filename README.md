@@ -2,7 +2,7 @@
 
 ## Source and fork
 
-Release fork of [oscarhenrycollins/claude-connection](https://github.com/oscarhenrycollins/claude-connection). Miguel's repository remains canonical in the public Wizard App Index; this fork is installed explicitly by repository and does not automatically publish to that index. Engine images are built from these sources in `humanitylabs-org/wizard-app-store`.
+Release fork of [oscarhenrycollins/claude-connection](https://github.com/oscarhenrycollins/claude-connection). Miguel's repository remains canonical in the public Wizard App Index; this fork is installed explicitly by repository and does not automatically publish to that index. Engine images are built from these sources in `humanitylabs-org/wizard-app-store`. The fork uses host port 18799 by default to avoid the legacy demo port; the engine remains private behind its front service.
 
 Connect your Claude subscription once; every agent on the box uses it, and you see how much is left.
 
