@@ -17,6 +17,8 @@ services:
       UPSTREAM_HOST: wizard-claude-engine
       UPSTREAM_PORT: "8799"
       PYTHONDONTWRITEBYTECODE: "1"
+    ports:
+      - "127.0.0.1:${APP_PORT}:8799"
     depends_on: [wizard-claude-engine]
     command:
     - python
@@ -239,7 +241,7 @@ services:
       is_main: true
       internal_port: 8799
   wizard-claude-engine:
-    image: ghcr.io/humanitylabs-org/wizard-claude:0.1.2@sha256:a3e5ec97211a7c088529be600afeb3cf05decc5ff2eac3374afa0a2106215d87
+    image: ghcr.io/humanitylabs-org/wizard-claude:0.2.0@sha256:b0aaf29416d1589d6970bad07a57b2cf688a86dbd551efec88648692d49f0113
     user: "1000:1000"
     read_only: true
     cap_drop: [ALL]
