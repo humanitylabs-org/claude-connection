@@ -9,7 +9,7 @@ version: 0.2.0
 summary: Connect your Claude subscription once; every agent on the box uses it, and you see how much is left.
 icon: icon.png
 license: MIT
-source: https://github.com/oscarhenrycollins/claude-connection
+source: https://github.com/humanitylabs-org/claude-connection
 runtime:
   kind: runtipi
   config: runtipi/config.json
