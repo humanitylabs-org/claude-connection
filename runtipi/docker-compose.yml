@@ -241,7 +241,7 @@ services:
       is_main: true
       internal_port: 8799
   wizard-claude-engine:
-    image: ghcr.io/humanitylabs-org/wizard-claude:0.2.0@sha256:b0aaf29416d1589d6970bad07a57b2cf688a86dbd551efec88648692d49f0113
+    image: ghcr.io/humanitylabs-org/wizard-claude:0.2.1@sha256:ab9978757511ffa532d893619733b750a6bbd0a80d4f9c6e19bc27921776f964
     user: "1000:1000"
     read_only: true
     cap_drop: [ALL]
