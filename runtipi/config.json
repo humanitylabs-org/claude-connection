@@ -11,7 +11,7 @@
   ],
   "description": "Connect your Claude Pro or Max subscription to your Wizard server once, with Anthropic's official Claude Code login. Hermes Agent (Wizard build) then uses it through NousResearch's official Claude Subscription plugin. The app also shows your plan and how much of your Claude usage is left, and reports both to Wizard's Resources screen. Your sign-in stays in a private shared folder (the same one AI Accounts used, so an existing sign-in carries over) and is never shown or sent anywhere by this app.",
   "tipi_version": 2,
-  "version": "0.2.1",
+  "version": "0.2.2",
   "source": "https://github.com/humanitylabs-org/claude-connection",
   "exposable": false,
   "supported_architectures": [
