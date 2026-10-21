@@ -13,8 +13,11 @@ server. It replaces the Claude part of the older AI Accounts app (decision #61: 
 - The sign-in is done **by the owner, on the Claude app's page** (`http://<server>:8799`). It runs the
   official Claude Code login. Never ask the owner for a code, token or password in chat, and never try
   to sign in yourself.
-- The login lives in a private shared volume mounted at `/claude` in agent apps that support it
-  (Hermes Agent from the Wizard App Store). Never read, copy, print or send anything from that folder.
+- The Claude app owns the login in its app-data (`data/claude`), exported as the `claude-login` share.
+  Hermes Agent declares `mounts: [{app: wizard-claude, share: claude-login, path: /claude}]`;
+  App Manager supplies the mount only while the owner grants it. The whole directory, including
+  Claude Code's `.oauth_refresh.lock`, is shared so official CLI processes coordinate renewal.
+  Never read, copy, print or send anything from that folder. Revocation removes the mount on restart.
 - Status and usage (read-only, never a token): the MCP tool `connection_status`, or
   `GET http://wizard-claude:8799/api/connection` from the app network. It returns the
   `wizard.ai-connection/2` shape: `status` (`connected`, `not_connected`, `expired`, `error`), `plan`

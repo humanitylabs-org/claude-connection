@@ -6,7 +6,13 @@ Release fork of [oscarhenrycollins/claude-connection](https://github.com/oscarhe
 
 Connect your Claude subscription once; every agent on the box uses it, and you see how much is left.
 
-A [Wizard app](https://www.aiwizards.com/wizard-apps) (System App) and the first per-provider **AI connection** app (decision #61: one connection app per AI provider). Open its page, press **Connect**, sign in with Claude, paste the code, and press **Test**. The sign-in runs Anthropic's official Claude Code login and stays in the private shared volume `wizard-ai-accounts-claude`, which agent apps (Hermes Agent from Wizard Apps) mount at `/claude`. Agents never see the token.
+A [Wizard app](https://www.aiwizards.com/wizard-apps) (System App) and the first per-provider **AI connection** app (decision #61: one connection app per AI provider). Open its page, press **Connect**, sign in with Claude, paste the code, and press **Test**. The sign-in runs Anthropic's official Claude Code login and stays in this app's `${APP_DATA_DIR}/data/claude`, mounted at `/claude` with the existing `CLAUDE_CONFIG_DIR=/claude` semantics. `wizard.md` exports it as `shares: [{id: claude-login, path: claude}]`. Hermes Agent declares `mounts: [{app: wizard-claude, share: claude-login, path: /claude}]`; App Manager supplies that bind mount only while the owner grants access. The official Claude Code client, not Hermes core, reads the login.
+
+## App-data and share migration (0.3.0)
+
+The engine image remains pinned to the unchanged 0.2.2 digest; 0.3.0 changes the recipe and ownership contract, not engine code. Keep the app-data directory writable by UID/GID 1000 and private to the owner. Back up the Claude app's app-data, not a Docker named volume. Sharing the whole config folder preserves Claude Code's refresh lock; consumers must use a compatible official CLI.
+
+Upgrade with the App Manager implementation of Wizard OS decisions #79/#80. It stops callers and copies the legacy `wizard-ai-accounts-claude` volume once into the Claude app's `data/claude`, preserving ownership and modes and leaving the old volume intact. Do not start old AI Accounts or a second box against a copied rotating login. Stock Runtipi alone does not perform this migration or compile share grants; a direct compose upgrade without the App Manager can present an empty login. Grant/revoke access through App Manager; never hard-code another app's app-data path in a consumer recipe.
 
 ## Contract: `wizard.ai-connection/2`
 

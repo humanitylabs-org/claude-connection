@@ -12,7 +12,7 @@ services:
     mem_limit: 128m
     environment:
       WIZARD_APP: wizard-claude
-      APP_VERSION: 0.2.2
+      APP_VERSION: 0.3.0
       FRONT_PORT: "8799"
       UPSTREAM_HOST: wizard-claude-engine
       UPSTREAM_PORT: "8799"
@@ -257,12 +257,9 @@ services:
       WIZARD_TRUSTED_ORIGINS: ${WIZARD_TRUSTED_ORIGINS:-}
       WIZARD_TRUSTED_HOSTS: ${WIZARD_TRUSTED_HOSTS:-}
     volumes:
-      # The Claude sign-in, shared with Hermes Agent (and the older AI Accounts app) under the same fixed
-      # name, so an existing sign-in carries over. Never under /media: the Files app serves that folder.
-      - claude-login:/claude
-volumes:
-  claude-login:
-    name: wizard-ai-accounts-claude
+      # App-owned login; wizard.md exports data/claude as the claude-login share.
+      # App Manager grants consumers access; never put credentials under /media.
+      - ${APP_DATA_DIR}/data/claude:/claude
 x-runtipi:
   schema_version: 2
   overrides: []
