@@ -1,34 +1,37 @@
 # Claude
 
-Connect your Claude subscription (Pro or Max) to this Wizard server once. Your agents use it from here, and you can see how much of your usage is left.
+Connect your Claude subscriptions (Pro or Max) to this Wizard server: one, or as many as you have. Your agents use them from here, and you can see how much of each one's usage is left.
 
 ## Connect Claude
 
-1. Open Claude and press **Connect**.
-2. Press the link it shows. It opens Claude's own sign-in page; use your phone or computer.
-3. Sign in. Claude shows you a code. Copy it, paste it into the page, and press **Finish connecting**.
-4. Press **Test**. It asks Claude for a one-word answer with the smallest model and shows OK or the error.
+1. Open Claude and press **Sign in** (or **+ Add** for another subscription).
+2. Press **Open sign-in**. It opens Claude's own sign-in page; use your phone or computer.
+3. Sign in. Claude shows you a code. Paste it into the page and press **Submit**.
 
-**Disconnect** signs this server out of Claude. Every agent using it stops until you connect again.
+Each subscription gets its own row with its plan and usage bars. **Manage** on a row offers **Reconnect** and **Remove** for subscriptions you added here.
+
+## Your original sign-in
+
+If this server was already connected (Claude 0.1, or AI Accounts), that sign-in stays as the first row and keeps working. When it needs to sign in again, the row shows **Sign in again**, which opens the original Claude Code sign-in page (Connect, paste the code, Test, Disconnect). On an agent without the Wizard OS account broker, **Sign in** opens that same page.
 
 ## Moving from AI Accounts
 
-Claude uses the same private sign-in folder as AI Accounts (`wizard-ai-accounts-claude`), so if you were connected there you are connected here. Install Claude, check it shows Connected, then you can uninstall AI Accounts; the sign-in stays because Claude still uses it.
+Claude uses the same private sign-in folder as AI Accounts (`wizard-ai-accounts-claude`), so if you were connected there you are connected here. Install Claude, check it shows Ready, then you can uninstall AI Accounts; the sign-in stays because Claude still uses it.
 
 ## How it works
 
-- The sign-in is done by **Anthropic's official Claude Code** (pinned version, auto-update off), running inside this app. The app only starts its login and passes it the code you paste.
-- Your plan and usage come from Anthropic's usage service, asked at most once a minute. The app never renews or copies the sign-in; Claude Code itself renews it when an agent (or **Test**) uses it.
-- **Hermes Agent** (Wizard build) mounts the same folder. Its built-in **Claude Subscription DirectSDK (Experimental)** plugin by Nous Research runs the same official Claude Code. Pick it in Hermes' model picker to use your subscription.
+- The original sign-in is done by **Anthropic's official Claude Code** (pinned version, auto-update off), running inside this app. Claude Code itself renews it when an agent (or **Test**) uses it.
+- Added subscriptions sign in inside your agent with **Hermes' own Claude sign-in** (`hermes auth add anthropic`) and live in its credential pool, which moves to the next subscription when one hits its limit. This app only starts the sign-in and passes the code you paste; it never holds those tokens.
+- Plan and usage come from Anthropic's usage service, asked at most once a minute.
 
 ## Privacy and access
 
-Keep this app on your private network (Tailscale). Public domain exposure is off. The status and usage answer is box-only: requests that arrive through Tailscale Serve, a tunnel or a proxy are refused. On a server with a public IP, block port 8799 at the provider firewall. You can also set an optional page password at install.
+Keep this app on your private network (Tailscale). Public domain exposure is off. The status and usage answer is box-only: requests that arrive through Tailscale Serve, a tunnel or a proxy are refused. Subscription changes are accepted only from this page itself. On a server with a public IP, block port 8799 at the provider firewall. You can also set an optional page password at install.
 
 ## Personal use only
 
-This is for using **your own** Claude subscription on **your own** server, through Anthropic's official app. If you build something for customers, use API keys instead.
+This is for using **your own** Claude subscriptions on **your own** server, through Anthropic's official sign-in. If you build something for customers, use API keys instead.
 
 ## Uninstalling
 
-Uninstalling Claude while Hermes Agent (or AI Accounts) is still installed keeps the sign-in. To remove it completely, press **Disconnect** first.
+Uninstalling Claude keeps every sign-in: the original one stays in its shared folder while Hermes Agent (or AI Accounts) is installed, and added subscriptions stay in your agent. To remove one, use **Remove** (added subscriptions) or **Disconnect** on the original sign-in page first.
