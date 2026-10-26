@@ -5,7 +5,7 @@ name: Claude
 type: external
 category: system
 tags: [security]
-version: 0.2.5
+version: 0.2.6
 summary: Connect one or more Claude subscriptions; every agent on the box uses them, and you see how much each has left.
 icon: icon.png
 license: MIT

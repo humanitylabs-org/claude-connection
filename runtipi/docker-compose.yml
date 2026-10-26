@@ -13,7 +13,7 @@ services:
     mem_limit: 128m
     environment:
       WIZARD_APP: wizard-claude
-      APP_VERSION: 0.2.5
+      APP_VERSION: 0.2.6
       FRONT_PORT: "8799"
       UPSTREAM_HOST: wizard-claude-engine
       UPSTREAM_PORT: "8799"
@@ -233,6 +233,11 @@ services:
           elif d.get("status") == "expired":
               d["next"] = ("Ask the owner to open the Claude app and press Sign in again on the expired subscription "
                            "(or + Add to add another subscription).")
+          elif (d.get("error") or {}).get("code") in ("unreachable", "not_configured", "login_rejected"):
+              d["next"] = ("The Claude app can't reach this agent's dashboard (error.message; the page shows the agent address). "
+                           "On a box where Wizard runs next to your own Hermes, run `wam alongside` and then any `wam app update ...` "
+                           "it prints (re-points the app at this agent and restarts it); otherwise `wam app update wizard-claude`. "
+                           "Check again; tell the owner in plain words if it still fails.")
           elif d.get("status") == "error" and (d.get("error") or {}).get("code") == "limit":
               d["next"] = "That subscription hit its limit; the owner can add another Claude subscription with + Add in the Claude app."
           return d
@@ -245,8 +250,8 @@ services:
       is_main: true
       internal_port: 8799
   wizard-claude-engine:
-    # Built and published by wizard-app-store images/wizard-claude at 801afc58 (#31), Build Claude run 40319542857.
-    image: ghcr.io/humanitylabs-org/wizard-claude:0.2.5@sha256:4a8f91cfa6abc829d17af533f18d23932a131ca48e2e821e870db0f474a2436f
+    # Built and published by wizard-app-store images/wizard-claude at 254ee6f2 (wizard-app-store #32), Build Claude run 40364246477.
+    image: ghcr.io/humanitylabs-org/wizard-claude:0.2.6@sha256:5c7ca0b3b38803794aa3296f69bed11253a4136c26acded9f3298ed115580745
     user: "1000:1000"
     read_only: true
     cap_drop: [ALL]
