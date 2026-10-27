@@ -4,11 +4,11 @@ Connect your Claude subscriptions (Pro or Max) to this Wizard server: one, or as
 
 ## Connect Claude
 
-1. Open Claude and press **Sign in** (or **+ Add** for another subscription).
+1. Open Claude and press **Connect** (or **Add account** for another subscription).
 2. Press **Open sign-in**. It opens Claude's own sign-in page; use your phone or computer.
 3. Sign in. Claude shows you a code. Paste it into the page and press **Submit**.
 
-Each subscription gets its own row with its plan and usage bars. **Manage** on a row offers **Reconnect** and **Remove** for subscriptions you added here.
+Each subscription gets its own row with its plan and usage bars. Tapping a row opens **Reconnect** and **Remove** for subscriptions you added here.
 
 ## Your original sign-in
 

@@ -11,7 +11,7 @@
   ],
   "description": "Connect your Claude Pro or Max subscriptions to your Wizard server: the original one with Anthropic's official Claude Code login, and as many more as you like, each signed in inside your agent with Hermes' own Claude sign-in. Your agent uses them all and moves to the next one when one hits its limit. The app shows each subscription's plan and how much of its usage is left, and reports them to Wizard's Resources screen. Sign-ins stay in your agent's own store and in a private shared folder (the same one AI Accounts used, so an existing sign-in carries over); this app never shows or sends a token.",
   "tipi_version": 1,
-  "version": "0.2.6",
+  "version": "0.2.7",
   "source": "https://github.com/oscarhenrycollins/claude-connection",
   "exposable": false,
   "supported_architectures": [
@@ -19,7 +19,7 @@
     "arm64"
   ],
   "created_at": 1792076857232,
-  "updated_at": 1792076857232,
+  "updated_at": 1793084548544,
   "dynamic_config": true,
   "min_tipi_version": "4.8.0",
   "uid": 1000,
