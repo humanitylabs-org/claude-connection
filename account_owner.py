@@ -20,6 +20,12 @@ class Pool:
         self.renewing = set()
         self.renewed_at = {}
         self.accounts = Accounts(self.root, 'claude', self)
+        owner_file = self.root / 'owner.json'
+        if not owner_file.exists():
+            self.atomic('owner.json', {'id': secrets.token_hex(16)})
+        self.owner_id = json.loads(owner_file.read_text())['id']
+        if not (self.root / 'accounts.json').exists():
+            self.accounts.save(self.accounts.rows())
 
     def atomic(self, name, value):
         fd, temporary = tempfile.mkstemp(prefix='.pending-', dir=self.root)
@@ -113,16 +119,18 @@ class Pool:
         self.readers.pop(ident, None)
 
     def integration(self):
-        # A provider login is not proof a host/alongside agent consumes the share.
-        # WAM writes this read-only marker only after a declared share grant is compiled.
-        marker = os.environ.get('WIZARD_CLAUDE_CONSUMER_STATE')
-        if marker:
-            try:
-                state = json.loads(Path(marker).read_text())
-                if state.get('share') == 'claude-login' and state.get('status') == 'mounted':
-                    return {'status': 'registered', 'connected': True}
-            except (OSError, ValueError):
-                pass
+        # Query the actual consuming agent, then compare a nonsecret app-owned identity.
+        # A reachable dashboard or an unused local login alone is never success.
+        from pool_client import Hermes, BridgeError
+        try:
+            result = Hermes.request('claude', '/app-status')
+            ids = sorted(row['id'] for row in self.accounts.rows())
+            if (result.get('contract') == 'wizard.app-owned-claude/1'
+                    and result.get('status') == 'mounted' and result.get('ownerId') == self.owner_id
+                    and sorted(result.get('accountIds') or []) == ids):
+                return {'status': 'registered', 'connected': True, 'in_use': result.get('in_use') is True}
+        except (BridgeError, ValueError, TypeError):
+            pass
         return {'status': 'unavailable', 'connected': False,
             'message': "Can't verify your agent's access. Ask it to connect the Claude app's claude-login share; sign-ins remain stored in this app."}
 
@@ -141,7 +149,7 @@ class Pool:
         for row in ordered:
             directory = str(self.directory(row['id']))
             try:
-                inference.token(directory)
+                inference.credential(directory)
                 return directory
             except inference.Fault:
                 continue
