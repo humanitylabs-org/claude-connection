@@ -1,9 +1,10 @@
 """Claude: the owner connects his Claude subscription once; agent apps on the same server reuse it.
 
-A Wizard AI connection app (contract wizard.ai-connection/1, decision #61). The login, test and
-logout run the unmodified official Claude Code CLI. The only code that opens the credential file is
-usage.py, which reads the access token solely to ask Anthropic for this account's usage limits; no
-route serves, copies or logs it, and nothing here refreshes it.
+A Wizard AI connection app (contract wizard.ai-connection/2, decisions #61 and #65).
+Login, test and logout run the unmodified official CLI. usage.py reads the app-owned
+access credential for usage; inference.py passes it only in the isolated
+CLI child environment for router-authorized inference. No route serves or logs credentials;
+refresh remains owned by the official CLI login/test flow.
 """
 from __future__ import annotations
 
@@ -27,9 +28,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
+# Also supports the existing isolated (-I) launch used by the test harness.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import inference
+
 import usage
 
-VERSION = "0.1.2"
+VERSION = "0.3.0"
 APP = Path(__file__).resolve().parent
 CLAUDE = os.environ.get("WIZARD_CLAUDE_CLAUDE", "/usr/local/bin/claude")
 CLAUDE_DIR = os.environ.get("WIZARD_CLAUDE_CLAUDE_DIR", "/claude")
@@ -41,7 +46,9 @@ LOGIN_TTL = 15 * 60
 SIGN_IN_HOSTS = {"claude.com", "claude.ai", "console.anthropic.com", "platform.claude.com"}
 ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][A-Za-z0-9]|\x1b[=>]")
 URL = re.compile(r"https://[^\s\"'<>]+")
-STATIC = {"/": ("index.html", "text/html; charset=utf-8"), "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+STATIC = {"/": ("index.html", "text/html; charset=utf-8"),
+          "/appearance.js": ("appearance.js", "text/javascript; charset=utf-8"),
+          "/appearance.css": ("appearance.css", "text/css; charset=utf-8"), "/app.js": ("app.js", "text/javascript; charset=utf-8"),
           "/app.css": ("app.css", "text/css; charset=utf-8"), "/SKILL.md": ("SKILL.md", "text/markdown; charset=utf-8")}
 # Owner-data routes are box-only: the same port is published on the tailnet (Serve, tunnels and
 # proxies add these headers), while agents and the Agent Service call the app on the app network.
@@ -57,31 +64,48 @@ class Renew:
     as the page's Test button). This app never refreshes a token. At most one attempt per RENEW_GAP_S."""
     lock = threading.Lock()
     at = 0.0
+    thread: threading.Thread | None = None
 
 
 RENEW_GAP_S = 600
 
 
-def renew_if_expired(answer: dict) -> dict:
+def renew_if_expired(answer: dict, reader=None) -> dict:
     if answer.get("status") != "expired" or os.environ.get("WIZARD_CLAUDE_AUTO_RENEW", "1") == "0":
         return answer
     with Renew.lock:
+        if Renew.thread is not None and Renew.thread.is_alive():
+            return {**answer, "status": "renewing"}
         if time.monotonic() - Renew.at < RENEW_GAP_S and Renew.at:
             return answer
-        Renew.at = time.monotonic()
-    code, _ = run_test()
-    return CONNECTION.read() if code == 200 else answer
+        # Only scheduling happens on the HTTP thread. The official CLI may take
+        # 120 seconds; never hold a GET (or this lock) through its execution.
+        Renew.thread = threading.Thread(target=_renew, args=(reader or CONNECTION,), daemon=True)
+        Renew.thread.start()
+    return {**answer, "status": "renewing"}
+
+
+def _renew(reader):
+    try:
+        code, _ = run_test()
+        if code == 200:
+            reader.read()  # same credential owner; the next GET reads fresh state
+    except Exception:
+        pass  # Never expose CLI/challenge output; expired state remains readable.
+    finally:
+        with Renew.lock:
+            Renew.at = time.monotonic()  # completion-based cooldown, including failure
 
 
 CONNECTION = usage.ConnectionReader(CLAUDE_DIR, os.environ.get("WIZARD_CLAUDE_USAGE_URL", usage.USAGE_URL))
 
 
-def claude_env() -> dict:
+def claude_env(directory=None) -> dict:
     """A clean environment: never inherit API keys or alternate backends into the official CLI."""
     WORK.mkdir(parents=True, exist_ok=True)
     home = WORK / "home"
     home.mkdir(exist_ok=True)
-    return {"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": str(home), "CLAUDE_CONFIG_DIR": CLAUDE_DIR,
+    return {"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": str(home), "CLAUDE_CONFIG_DIR": directory or CLAUDE_DIR,
             "DISABLE_AUTOUPDATER": "1", "DISABLE_TELEMETRY": "1", "DISABLE_ERROR_REPORTING": "1",
             "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "BROWSER": "/bin/true", "TERM": "xterm-256color",
             "COLUMNS": "1000", "LANG": "C.UTF-8", "TMPDIR": str(WORK)}
@@ -130,14 +154,15 @@ def claude_status() -> dict:
 class Login:
     """One official `claude auth login` running in a pseudo-terminal, waiting for the pasted code."""
 
-    def __init__(self):
+    def __init__(self, directory=None, lease=None):
         master, slave = os.openpty()
         attrs = termios.tcgetattr(slave)
         attrs[3] &= ~termios.ECHO  # the pasted code is never echoed back into the captured output
         termios.tcsetattr(slave, termios.TCSANOW, attrs)
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 50, 1000, 0, 0))
         self.proc = subprocess.Popen([CLAUDE, "auth", "login", "--claudeai"], stdin=slave, stdout=slave, stderr=slave,
-                                     env=claude_env(), cwd=WORK, start_new_session=True, close_fds=True)
+                                     env=claude_env(directory), cwd=WORK, start_new_session=True, close_fds=True,
+                                     pass_fds=() if lease is None else (lease,))
         os.close(slave)
         self.master, self.buf, self.lock = master, "", threading.Lock()
         self.started, self.code_sent = time.monotonic(), False
@@ -279,7 +304,7 @@ def logout() -> tuple[int, dict]:
         return (200 if ok else 500), {"ok": ok, "message": message, "claude": status}
 
 
-def run_test() -> tuple[int, dict]:
+def run_test(directory=None) -> tuple[int, dict]:
     if not State.busy.acquire(blocking=False):
         return 409, {"ok": False, "message": "A test is already running."}
     try:
@@ -289,7 +314,7 @@ def run_test() -> tuple[int, dict]:
                "--no-session-persistence", "--tools", "", "--strict-mcp-config", "--max-turns", "1"]
         start = time.monotonic()
         try:
-            out = subprocess.run(cmd, env=claude_env(), cwd=work, capture_output=True, text=True, timeout=120,
+            out = subprocess.run(cmd, env=claude_env(directory), cwd=work, capture_output=True, text=True, timeout=120,
                                  stdin=subprocess.DEVNULL)
         except (OSError, subprocess.TimeoutExpired):
             return 504, {"ok": False, "message": "Claude did not answer within 2 minutes."}
@@ -318,7 +343,7 @@ def card(host: str) -> dict:
         "x-wizard": {
             "kind": "system-agent-app",
             "provides": ["ai-connection", "claude-subscription"],
-            "contract": usage.CONTRACT,
+            "contract": "wizard.ai-connection/2",
             "skill": f"{base}/SKILL.md",
             "connection_api": f"{base}/api/connection",
             "shared_volume": {"name": "wizard-ai-accounts-claude", "mount": "/claude", "uid": 1000, "gid": 1000,
@@ -359,6 +384,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send(code, json.dumps(data).encode(), "application/json")
 
     def authorized(self, path: str) -> bool:
+        if path == "/api/connection" and self.headers.get("X-Wizard-Grant"):
+            try:
+                if inference.admit(self.headers):
+                    return True
+            except inference.Fault as e:
+                self.json(e.status, e.payload())
+                return False
         if not PASSWORD or path == "/health":
             return True
         header = self.headers.get("Authorization", "")
@@ -393,7 +425,14 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/connection":
             if self.proxied():
                 return self.json(403, {"error": "box-only: call this from the server (app network or 127.0.0.1)"})
-            return self.json(200, renew_if_expired(CONNECTION.read()))
+            answer = renew_if_expired(CONNECTION.read())
+            if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
+                # Service-supplied subscription credential, never written to the login volume.
+                answer = {**answer, "status": "connected", "error": None}
+            try:
+                return self.json(200, {**answer, "contract": "wizard.ai-connection/2", "models": inference.models()})
+            except inference.Fault as e:
+                return self.json(200, {**answer, "contract": "wizard.ai-connection/2", "models": [], "models_error": {"code": e.code, "message": str(e)}})
         if path == "/api/accounts":
             login = State.login
             claude = {"id": "claude-subscription", "name": "Claude subscription", "kind": "subscription",
@@ -408,6 +447,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
+        if path == "/api/infer":
+            return inference.handle(self, CLAUDE, CLAUDE_DIR, WORK)
         if not self.authorized(path):
             return
         origin = self.headers.get("Origin")

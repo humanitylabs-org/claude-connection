@@ -5,7 +5,7 @@ name: Claude
 type: external
 category: system
 tags: [security]
-version: 0.2.6
+version: 0.3.0
 summary: Connect one or more Claude subscriptions; every agent on the box uses them, and you see how much each has left.
 icon: icon.png
 license: MIT
@@ -14,6 +14,9 @@ runtime:
   kind: runtipi
   config: runtipi/config.json
   compose: runtipi/docker-compose.yml
+  package:
+    mode: source
+    root: .
 mcp:
   path: /mcp
   port: 8799
@@ -25,11 +28,14 @@ view:
 provides:
 - ai-connection
 - claude-subscription
+shares:
+- id: claude-login
+  path: claude
 health: /health
 ---
 
 # Claude
 
-Connect your Claude Pro or Max subscriptions. The original sign-in runs Anthropic's official Claude Code login and stays in a private shared volume; **+ Add** signs in more subscriptions (any number) inside your agent with Hermes' own Claude sign-in, so your agent rotates across them when one hits its limit. Agents never see a token.
+Sign in with your subscription in this connection app. Add as many subscriptions as you need on one accounts page. Sign-in and renewal live in private app-data, not your agent. The page reports provider status separately from whether the agent can use it, so an alongside box cannot mistake an unused local login for a working agent connection.
 
-This is a Wizard AI connection app (`wizard.ai-connection/2`): `GET /api/connection` reports the overall status, plan and usage plus one row per subscription, `GET /api/accounts` lists the subscriptions, and the MCP tool `connection_status` gives agents the same answer. Adding, reconnecting and removing subscriptions goes through the agent's dashboard (Wizard OS plugin, stock `hermes auth`); the original Claude Code sign-in keeps its own page at `/claude-code/`. Engine source: `humanitylabs-org/wizard-app-store` `images/wizard-claude`.
+See `docs/APP_OWNED_LOGIN.md` for the design, onboarding integration, exclusive migration requirements, and evidence boundaries. Existing agent-owned subscriptions are not silently copied or deleted.

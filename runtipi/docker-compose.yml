@@ -13,7 +13,7 @@ services:
     mem_limit: 128m
     environment:
       WIZARD_APP: wizard-claude
-      APP_VERSION: 0.2.6
+      APP_VERSION: 0.3.0
       FRONT_PORT: "8799"
       UPSTREAM_HOST: wizard-claude-engine
       UPSTREAM_PORT: "8799"
@@ -249,9 +249,30 @@ services:
     x-runtipi:
       is_main: true
       internal_port: 8799
+  data-init:
+    image: python:3.12-alpine@sha256:1b668429b3511ab407d8e00648891631b0b1a4d7e15e3ca70f38ab5b91ad4ab4
+    user: "0:0"
+    restart: "no"
+    network_mode: none
+    cap_drop: [ALL]
+    cap_add: [CHOWN, FOWNER, DAC_OVERRIDE]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+    command:
+      - python3
+      - -c
+      - |
+        import os
+        from pathlib import Path
+        for p in (Path('/data'), Path('/data/claude')):
+            p.mkdir(mode=0o700, parents=True, exist_ok=True)
+            os.chown(p, 1000, 1000)
+            os.chmod(p, 0o700)
   wizard-claude-engine:
     # Built and published by wizard-app-store images/wizard-claude at 254ee6f2 (wizard-app-store #32), Build Claude run 40364246477.
     image: ghcr.io/humanitylabs-org/wizard-claude:0.2.6@sha256:5c7ca0b3b38803794aa3296f69bed11253a4136c26acded9f3298ed115580745
+    command: ["python3", "/app/pool_server.py"]
     user: "1000:1000"
     read_only: true
     cap_drop: [ALL]
@@ -263,6 +284,9 @@ services:
     tmpfs: ["/tmp:rw,nosuid,size=64m,uid=1000,gid=1000"]
     environment:
       WIZARD_CLAUDE_PORT: "8799"
+      WIZARD_POOL_PROVIDER: claude
+      WIZARD_POOL_BIND: 0.0.0.0
+      WIZARD_POOL_PORT: "8799"
       WIZARD_CLAUDE_PASSWORD: ${WIZARD_CLAUDE_PASSWORD:-}
       WIZARD_TRUSTED_ORIGINS: ${WIZARD_TRUSTED_ORIGINS:-}
       WIZARD_TRUSTED_HOSTS: ${WIZARD_TRUSTED_HOSTS:-}
@@ -271,16 +295,18 @@ services:
       WIZARD_CLAUDE_HERMES_URL: ${WIZARD_CLAUDE_HERMES_URL:-http://hermes-agent:9119}
       WIZARD_CLAUDE_HERMES_USER: ${HERMES_DASHBOARD_BASIC_AUTH_USERNAME:-hermes}
       WIZARD_CLAUDE_HERMES_PASSWORD: ${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD:-}
-    volumes:
-      # The original Claude sign-in (Claude Code), shared with Hermes Agent (and the older AI Accounts app) under
-      # the same fixed name, so an existing sign-in carries over and stays the first row. Never under /media.
-      - claude-login:/claude
     x-runtipi:
       # Joins the Runtipi main network so it can reach the Hermes Agent app's dashboard by name.
       add_to_main_network: true
 volumes:
   claude-login:
     name: wizard-ai-accounts-claude
+    volumes:
+      - ${APP_SOURCE_DIR:?source package required}:/app:ro
+      - ${APP_DATA_DIR}/data/claude:/claude
+    depends_on:
+      data-init:
+        condition: service_completed_successfully
 x-runtipi:
   schema_version: 2
   overrides: []

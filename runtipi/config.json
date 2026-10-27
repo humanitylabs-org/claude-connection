@@ -9,9 +9,9 @@
   "categories": [
     "network"
   ],
-  "description": "Connect your Claude Pro or Max subscriptions to your Wizard server: the original one with Anthropic's official Claude Code login, and as many more as you like, each signed in inside your agent with Hermes' own Claude sign-in. Your agent uses them all and moves to the next one when one hits its limit. The app shows each subscription's plan and how much of its usage is left, and reports them to Wizard's Resources screen. Sign-ins stay in your agent's own store and in a private shared folder (the same one AI Accounts used, so an existing sign-in carries over); this app never shows or sends a token.",
-  "tipi_version": 1,
-  "version": "0.2.6",
+  "description": "Connect any number of Claude subscriptions in this app. The app owns sign-in and renewal in private app-data. Your agent consumes an owner-granted connection; provider credentials do not belong to the agent.",
+  "tipi_version": 2,
+  "version": "0.3.0",
   "source": "https://github.com/oscarhenrycollins/claude-connection",
   "exposable": false,
   "supported_architectures": [
@@ -36,17 +36,17 @@
       "type": "text",
       "label": "Hermes Agent dashboard username",
       "env_variable": "HERMES_DASHBOARD_BASIC_AUTH_USERNAME",
-      "required": true,
+      "required": false,
       "default": "hermes",
-      "hint": "Filled in automatically from your agent. Used only to add, reconnect or remove Claude subscriptions inside the agent."
+      "hint": "Used for agent connection registration/status only, never to sign in to your subscription."
     },
     {
       "type": "password",
       "label": "Hermes Agent dashboard password",
       "env_variable": "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD",
-      "required": true,
+      "required": false,
       "min": 16,
-      "hint": "Filled in automatically from your agent (the same dashboard password). Added subscriptions sign in inside the agent, so this app never sees those tokens."
+      "hint": "Used for agent connection registration/status only, never to sign in to your subscription."
     },
     {
       "type": "text",
