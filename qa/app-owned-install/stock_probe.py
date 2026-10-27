@@ -25,7 +25,7 @@ if provider=='claude':
     os.environ['CLAUDE_SUBSCRIPTION_DIRECTSDK_COMMAND']=str(cli)
     os.environ['PROBE_CONSUMED_PATH']=str(root/'proof'/'consumed-claude-accounts.txt')
     name='claude-subscription-directsdk-experimental';model='claude-sonnet-5'
-    kwargs={'provider':name,'api_mode':'chat_completions','process_command':str(cli),
+    kwargs={'provider':name,'api_mode':'chat_completions','command':str(cli),
             'api_key':'external-process','base_url':'process://'+name}
 else:
     source=root/'proof'/'installed-chatgpt'/'data'
@@ -36,8 +36,8 @@ else:
 (home/'config.yaml').write_text('model:\n  provider: '+name+'\n  default: '+model+'\nplugins:\n  enabled: []\n')
 from run_agent import AIAgent
 answers=[]
-agent=AIAgent(model=model,quiet=True,max_iterations=2,enabled_toolsets=[],
-              skip_context_files=True,skip_memory=True,compression_enabled=False,**kwargs)
+agent=AIAgent(model=model,quiet_mode=True,max_iterations=2,enabled_toolsets=[],
+              skip_context_files=True,skip_memory=True,**kwargs)
 for i in range(2):
     result=agent.run_conversation('Say one short word.',system_message='You are an isolated acceptance test. No tools.')
     answer=result.get('final_response','')
