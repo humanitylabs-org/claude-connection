@@ -16,6 +16,8 @@ class Pool:
         self.logins = {}
         self.readers = {}
         self.lock = threading.RLock()
+        self.renewal_done = threading.Condition(self.lock)
+        self.renewal_failed = set()
         self.cursor = 0
         self.renewing = set()
         self.renewed_at = {}
@@ -52,11 +54,19 @@ class Pool:
     def has_legacy(self):
         return (self.root / '.credentials.json').exists()
 
+    def needs_renewal(self, ident):
+        import time
+        try:
+            auth = json.loads((self.directory(ident) / '.credentials.json').read_text())['claudeAiOauth']
+            return bool(auth.get('refreshToken')) and auth.get('expiresAt', 0) <= (time.time() + 120) * 1000
+        except (OSError, ValueError, KeyError, TypeError):
+            return False
+
     def status(self, ident):
         if ident not in self.readers:
             self.readers[ident] = usage.ConnectionReader(str(self.directory(ident)), os.environ.get('WIZARD_CLAUDE_USAGE_URL', usage.USAGE_URL))
         result = self.readers[ident].read()
-        if result.get('status') == 'expired' and os.environ.get('WIZARD_CLAUDE_AUTO_RENEW', '1') != '0':
+        if (result.get('status') == 'expired' or self.needs_renewal(ident)) and os.environ.get('WIZARD_CLAUDE_AUTO_RENEW', '1') != '0':
             import time
             with self.lock:
                 if ident in self.renewing:
@@ -65,18 +75,41 @@ class Pool:
                     self.renewing.add(ident)
                     threading.Thread(target=self._renew, args=(ident,), daemon=True).start()
                     return {**result, 'status': 'renewing'}
+        if ident in self.renewal_failed and self.needs_renewal(ident):
+            return {**result, 'status': 'expired', 'error': {'code': 'expired', 'message': 'Claude could not renew this sign-in. Press Reconnect to sign in again.'}}
         return result
 
     def _renew(self, ident):
         import server
         import time
         try:
-            server.run_test(str(self.directory(ident)))
+            # Keep the official CLI as the only refresher, sharing its own
+            # credential-file transaction with CLI consumers of this directory.
+            _, result = server.run_test(str(self.directory(ident)))
+            with self.lock:
+                if result.get('ok') and not self.needs_renewal(ident):
+                    self.renewal_failed.discard(ident)
+                else:
+                    self.renewal_failed.add(ident)
         finally:
             with self.lock:
                 self.renewed_at[ident] = time.monotonic()
                 self.renewing.discard(ident)
                 self.readers.pop(ident, None)
+                self.renewal_done.notify_all()
+
+    def renew_before_inference(self, ident):
+        import time
+        if not self.needs_renewal(ident) or os.environ.get('WIZARD_CLAUDE_AUTO_RENEW', '1') == '0':
+            return
+        with self.renewal_done:
+            if ident in self.renewing:
+                self.renewal_done.wait_for(lambda: ident not in self.renewing, timeout=125)
+                return
+            if time.monotonic() - self.renewed_at.get(ident, -1000) < 600:
+                return
+            self.renewing.add(ident)
+        self._renew(ident)
 
     def connect(self, ident, lease=None):
         import server
@@ -146,14 +179,18 @@ class Pool:
             self.cursor += 1
         import inference
         ordered = rows[offset:] + rows[:offset]
+        last = inference.Fault('signed_out', 'Connect Claude first.', 401)
         for row in ordered:
             directory = str(self.directory(row['id']))
             try:
+                self.renew_before_inference(row['id'])
+                if row['id'] in self.renewal_failed and self.needs_renewal(row['id']):
+                    raise inference.Fault('expired', 'Claude could not renew. Reconnect in the Claude app.', 401)
                 inference.credential(directory)
                 return directory
-            except inference.Fault:
-                continue
-        return str(self.directory(ordered[0]['id']))  # preserve structured expired/signed_out errors
+            except inference.Fault as error:
+                last = error
+        raise last
 
 
 _INSTANCE = None
