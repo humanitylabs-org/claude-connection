@@ -1,5 +1,14 @@
 # Claude
 
+> **Contribution fork — upstream is canonical.** Wizard OS releases install
+> [oscarhenrycollins/claude-connection](https://github.com/oscarhenrycollins/claude-connection).
+> The app-owned multi-subscription port is contributed there as
+> [upstream PR #4](https://github.com/oscarhenrycollins/claude-connection/pull/4),
+> rebuilt on Oscar's current code rather than this fork's older divergent main.
+> Follow upstream for release/onboarding work. Do not pin new boxes to this fork's
+> main or treat a fork-only login fix as shipped. Existing pins/data are not changed
+> by this documentation notice.
+
 ## Source and fork
 
 Release fork of [oscarhenrycollins/claude-connection](https://github.com/oscarhenrycollins/claude-connection). Miguel's repository remains canonical in the public Wizard App Index; this fork is installed explicitly by repository and does not automatically publish to that index. Engine images are built from these sources in `humanitylabs-org/wizard-app-store`. The fork uses host port 18799 by default to avoid the legacy demo port; the engine remains private behind its front service.
