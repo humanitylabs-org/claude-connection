@@ -250,7 +250,7 @@ services:
       is_main: true
       internal_port: 8799
   data-init:
-    image: python:3.12-alpine@sha256:1b668429b3511ab407d8e00648891631b0b1a4d7e15e3ca70f38ab5b91ad4ab4
+    image: ghcr.io/humanitylabs-org/wizard-claude:0.2.7@sha256:93402abc9c87158704ba5867964181b237e9758757de790575344ca303d537c7
     user: "0:0"
     restart: "no"
     network_mode: none
@@ -271,7 +271,7 @@ services:
             os.chmod(p, 0o700)
   wizard-claude-engine:
     # Built and published by wizard-app-store images/wizard-claude at 254ee6f2 (wizard-app-store #32), Build Claude run 40364246477.
-    image: ghcr.io/humanitylabs-org/wizard-claude:0.2.6@sha256:5c7ca0b3b38803794aa3296f69bed11253a4136c26acded9f3298ed115580745
+    image: ghcr.io/humanitylabs-org/wizard-claude:0.2.7@sha256:93402abc9c87158704ba5867964181b237e9758757de790575344ca303d537c7
     command: ["python3", "/app/pool_server.py"]
     user: "1000:1000"
     read_only: true
@@ -290,17 +290,13 @@ services:
       WIZARD_CLAUDE_PASSWORD: ${WIZARD_CLAUDE_PASSWORD:-}
       WIZARD_TRUSTED_ORIGINS: ${WIZARD_TRUSTED_ORIGINS:-}
       WIZARD_TRUSTED_HOSTS: ${WIZARD_TRUSTED_HOSTS:-}
-      # Added subscriptions (any number) live in the agent's own credential pool. This app adds, reconnects and
-      # removes them through the agent's dashboard (Wizard OS plugin, stock `hermes auth`), never holding a token.
+      # All subscriptions live in this app's data. The dashboard only verifies consumer access.
       WIZARD_CLAUDE_HERMES_URL: ${WIZARD_CLAUDE_HERMES_URL:-http://hermes-agent:9119}
       WIZARD_CLAUDE_HERMES_USER: ${HERMES_DASHBOARD_BASIC_AUTH_USERNAME:-hermes}
       WIZARD_CLAUDE_HERMES_PASSWORD: ${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD:-}
     x-runtipi:
       # Joins the Runtipi main network so it can reach the Hermes Agent app's dashboard by name.
       add_to_main_network: true
-volumes:
-  claude-login:
-    name: wizard-ai-accounts-claude
     volumes:
       - ${APP_SOURCE_DIR:?source package required}:/app:ro
       - ${APP_DATA_DIR}/data/claude:/claude
