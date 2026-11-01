@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import private_storage
 
 MAX_BODY = 256 * 1024
 CODES = {"signed_out", "expired", "limit", "unreachable", "provider_error"}
@@ -178,7 +179,7 @@ def run(data, cli, directory, work):
     """Yield provisional text; done requires the CLI's successful effective-model result."""
     token = credential(directory)
     fast = data["model"] == "claude-haiku-4-5" and "web_search" not in data.get("abilities", [])
-    work.mkdir(parents=True, exist_ok=True)
+    private_storage.directory(work)
     with tempfile.TemporaryDirectory(prefix="infer-", dir=work) as root:
         root = Path(root)
         for folder in (root / "home", root / "config", root / "cwd"):
@@ -208,7 +209,7 @@ def run(data, cli, directory, work):
             spare_env = {**env, "HOME":str(spare_root/"home"), "CLAUDE_CONFIG_DIR":str(spare_root/"config"), "TMPDIR":str(spare_root)}
             try:
                 proc = subprocess.Popen(argv, env=spare_env, cwd=spare_root / "cwd", stdin=subprocess.PIPE,
-                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True)
+                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True, umask=0o077)
             except Exception:
                 temp.cleanup()
                 raise
@@ -229,7 +230,7 @@ def run(data, cli, directory, work):
                 child, dispose = spare
             else:
                 child = subprocess.Popen(argv, env=env, cwd=root / "cwd", stdin=subprocess.PIPE,
-                                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True)
+                                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True, umask=0o077)
             if fast:
                 FAST_SPARE.arm(key, spawn_spare)
             def write():

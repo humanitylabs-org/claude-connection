@@ -33,6 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import inference
 
 import usage
+import private_storage
 
 VERSION = "0.2.2"
 APP = Path(__file__).resolve().parent
@@ -85,9 +86,10 @@ CONNECTION = usage.ConnectionReader(CLAUDE_DIR, os.environ.get("WIZARD_CLAUDE_US
 
 def claude_env() -> dict:
     """A clean environment: never inherit API keys or alternate backends into the official CLI."""
-    WORK.mkdir(parents=True, exist_ok=True)
+    private_storage.directory(WORK)
+    private_storage.harden_login(CLAUDE_DIR)
     home = WORK / "home"
-    home.mkdir(exist_ok=True)
+    private_storage.directory(home)
     return {"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": str(home), "CLAUDE_CONFIG_DIR": CLAUDE_DIR,
             "DISABLE_AUTOUPDATER": "1", "DISABLE_TELEMETRY": "1", "DISABLE_ERROR_REPORTING": "1",
             "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "BROWSER": "/bin/true", "TERM": "xterm-256color",
@@ -107,7 +109,7 @@ def plan_label(raw) -> str:
 
 def claude_version() -> str:
     try:
-        out = subprocess.run([CLAUDE, "--version"], env=claude_env(), capture_output=True, text=True, timeout=20)
+        out = subprocess.run([CLAUDE, "--version"], env=claude_env(), capture_output=True, text=True, timeout=20, umask=0o077)
         return out.stdout.strip().split(" ")[0]
     except (OSError, subprocess.TimeoutExpired):
         return ""
@@ -121,7 +123,7 @@ def claude_status() -> dict:
         return {"status": "error", "detail": "The shared Claude login folder is not writable."}
     try:
         out = subprocess.run([CLAUDE, "auth", "status", "--json"], env=claude_env(), cwd=WORK,
-                             capture_output=True, text=True, timeout=30)
+                             capture_output=True, text=True, timeout=30, umask=0o077)
         data = json.loads(out.stdout or "{}")
     except (OSError, subprocess.TimeoutExpired, ValueError):
         return {"status": "error", "detail": "Could not read the sign-in status from Claude Code."}
@@ -144,7 +146,7 @@ class Login:
         termios.tcsetattr(slave, termios.TCSANOW, attrs)
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 50, 1000, 0, 0))
         self.proc = subprocess.Popen([CLAUDE, "auth", "login", "--claudeai"], stdin=slave, stdout=slave, stderr=slave,
-                                     env=claude_env(), cwd=WORK, start_new_session=True, close_fds=True)
+                                     env=claude_env(), cwd=WORK, start_new_session=True, close_fds=True, umask=0o077)
         os.close(slave)
         self.master, self.buf, self.lock = master, "", threading.Lock()
         self.started, self.code_sent = time.monotonic(), False
@@ -198,13 +200,9 @@ class Login:
         if self.proc.poll() is None:
             self.close()
             return {"ok": False, "message": "Claude did not answer in time. Try connecting again."}
-        tail = self.text()[mark:]
-        match = re.search(r"Login (successful[^\n]*|failed[^\n]*)", tail)
-        message = URL.sub("[link]", match.group(0).strip())[:200] if match else ""
         ok = self.proc.returncode == 0
         self.close()
-        if not message:
-            message = "Signed in." if ok else "Claude did not accept that code. Start again and paste the newest code."
+        message = "Signed in." if ok else "Claude did not accept that code. Start again and paste the newest code."
         return {"ok": ok, "message": message}
 
     def alive(self) -> bool:
@@ -225,6 +223,7 @@ class Login:
         except OSError:
             pass
         self.proc.wait()
+        private_storage.harden_login(CLAUDE_DIR)
 
 
 class State:
@@ -277,12 +276,13 @@ def logout() -> tuple[int, dict]:
     with State.busy:
         try:
             out = subprocess.run([CLAUDE, "auth", "logout"], env=claude_env(), cwd=WORK,
-                                 capture_output=True, text=True, timeout=60)
+                                 capture_output=True, text=True, timeout=60, umask=0o077)
         except (OSError, subprocess.TimeoutExpired):
             return 500, {"ok": False, "message": "Claude Code did not finish signing out."}
+        private_storage.harden_login(CLAUDE_DIR)
         status = claude_status()
         ok = status.get("status") == "not_connected"
-        message = "Disconnected." if ok else (clean(out.stdout + out.stderr).strip()[:200] or "Still connected.")
+        message = "Disconnected." if ok else "Still connected. Try disconnecting again."
         return (200 if ok else 500), {"ok": ok, "message": message, "claude": status}
 
 
@@ -291,13 +291,13 @@ def run_test() -> tuple[int, dict]:
         return 409, {"ok": False, "message": "A test is already running."}
     try:
         work = WORK / "test"
-        work.mkdir(parents=True, exist_ok=True)
+        private_storage.directory(work)
         cmd = [CLAUDE, "-p", "Reply with exactly the word OK.", "--model", "haiku", "--output-format", "json",
                "--no-session-persistence", "--tools", "", "--strict-mcp-config", "--max-turns", "1"]
         start = time.monotonic()
         try:
             out = subprocess.run(cmd, env=claude_env(), cwd=work, capture_output=True, text=True, timeout=120,
-                                 stdin=subprocess.DEVNULL)
+                                 stdin=subprocess.DEVNULL, umask=0o077)
         except (OSError, subprocess.TimeoutExpired):
             return 504, {"ok": False, "message": "Claude did not answer within 2 minutes."}
         seconds = round(time.monotonic() - start, 1)
@@ -307,12 +307,15 @@ def run_test() -> tuple[int, dict]:
             return 502, {"ok": False, "message": "Claude Code returned no result.", "seconds": seconds}
         reply = URL.sub("[link]", clean(str(data.get("result") or ""))).strip()[:200]
         models = sorted((data.get("modelUsage") or {}).keys())
-        if data.get("is_error"):
-            return 502, {"ok": False, "message": reply or "Claude returned an error.", "seconds": seconds}
+        if data.get("is_error") or reply != "OK":
+            return 502, {"ok": False, "message": "Claude did not return the expected test answer.", "seconds": seconds}
         return 200, {"ok": True, "message": "OK: Claude answered.", "reply": reply, "model": models[0] if models else "",
                      "seconds": seconds}
     finally:
-        State.busy.release()
+        try:
+            private_storage.harden_login(CLAUDE_DIR)
+        finally:
+            State.busy.release()
 
 
 def card(host: str) -> dict:
@@ -342,7 +345,8 @@ class Handler(BaseHTTPRequestHandler):
     sys_version = ""
 
     def log_message(self, format, *args):  # noqa: A002 - request lines only; never bodies
-        sys.stderr.write("%s %s\n" % (self.command, urlsplit(self.path).path))
+        # No caller-controlled path or CLI/provider text in logs.
+        sys.stderr.write("Claude request completed.\n")
 
     def send(self, code: int, body: bytes, ctype: str):
         self.send_response(code)
@@ -465,17 +469,22 @@ class Handler(BaseHTTPRequestHandler):
 class Server(ThreadingHTTPServer):
     daemon_threads = True
 
+    def handle_error(self, request, client_address):
+        sys.stderr.write("Claude request failed.\n")
+
     def server_bind(self):  # skip getfqdn(): it stalls without a resolver
         socketserver.TCPServer.server_bind(self)
         self.server_name, self.server_port = str(self.server_address[0]), self.server_address[1]
 
 
 def main():
-    WORK.mkdir(parents=True, exist_ok=True)
+    os.umask(0o077)
+    private_storage.directory(WORK)
     for _ in range(120):  # Runtipi may still be preparing the shared volume
         if os.access(CLAUDE_DIR, os.W_OK):
             break
         time.sleep(1)
+    private_storage.harden_login(CLAUDE_DIR)
     server = Server((BIND, PORT), Handler)
     signal.signal(signal.SIGTERM, lambda *_: threading.Thread(target=server.shutdown, daemon=True).start())
     print(f"Claude {VERSION} on {BIND}:{PORT}", flush=True)
