@@ -81,6 +81,12 @@ class PrivateStorageTests(unittest.TestCase):
             for call in calls:
                 self.assertTrue(any(k.arg=='umask' and isinstance(k.value,ast.Constant) and k.value.value==0o077 for k in call.keywords), filename+':'+str(call.lineno))
 
+    def test_container_context_includes_private_storage_helper(self):
+        # COPY alone is insufficient when a deny-by-default .dockerignore removes the helper.
+        root = Path(__file__).resolve().parent
+        self.assertIn('private_storage.py', (root/'Dockerfile').read_text())
+        self.assertIn('!private_storage.py', (root/'.dockerignore').read_text().splitlines())
+
     def test_mcp_errors_are_sanitized(self):
         spec=importlib.util.spec_from_file_location('test_front', Path(__file__).parent/'mcp/front.py')
         assert spec is not None and spec.loader is not None
