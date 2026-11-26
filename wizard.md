@@ -5,7 +5,7 @@ name: Claude
 type: external
 category: system
 tags: [security]
-version: 0.2.26
+version: 0.2.27
 summary: Connect one or more Claude subscriptions; every agent on the box uses them, and you see how much each has left.
 icon: icon.png
 license: MIT
@@ -26,6 +26,9 @@ provides:
 - ai-connection
 - claude-subscription
 health: /health
+switches:
+  contract: wizard.app-switches/1
+  path: /api/switches
 ---
 
 # Claude
