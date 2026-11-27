@@ -13,7 +13,7 @@ services:
     mem_limit: 128m
     environment:
       WIZARD_APP: wizard-claude
-      APP_VERSION: 0.2.27
+      APP_VERSION: 0.2.28
       FRONT_PORT: "8799"
       UPSTREAM_HOST: wizard-claude-engine
       UPSTREAM_PORT: "8799"
@@ -250,8 +250,8 @@ services:
       is_main: true
       internal_port: 8799
   wizard-claude-engine:
-    # Built and published by wizard-app-store images/wizard-claude from wizard-app-store #90.
-    image: ghcr.io/humanitylabs-org/wizard-claude:0.2.29@sha256:c7155fc3d4d19186ca92f765410b8a5c83085a313cfa7bbac1186fc155b55ee3
+    # Built and published by wizard-app-store images/wizard-claude from wizard-app-store #95.
+    image: ghcr.io/humanitylabs-org/wizard-claude:0.2.30@sha256:199129b42958a49624ee8d24557e01f36c53da11e8028b8844cc2aafdd3db74d
     user: "1000:1000"
     read_only: true
     cap_drop: [ALL]
